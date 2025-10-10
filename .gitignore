@@ -12,8 +12,13 @@ node_modules/
 dist/
 
 # Data (big PDFs not in git)
-data/
+data/processed/
+data/temp/
 docs/snippets/
+
+# Keep PDFs but ignore processed data
+!data/pdfs/
+!data/PDF_COLLECTION_GUIDE.md
 
 # VS Code
 .vscode/settings.json
