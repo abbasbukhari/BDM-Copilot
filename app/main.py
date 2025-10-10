@@ -9,13 +9,64 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
+import sys
+import os
 
-# Page configuration
+# Add the parent directory to path to import our engine
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from engine import KnowledgeBase
+
+# Set page config
 st.set_page_config(
     page_title="BDM Copilot",
-    page_icon="🤝",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_icon="🤖",
+    layout="wide"
+)
+
+# Initialize knowledge base
+@st.cache_resource
+def load_knowledge_base():
+    """Load and cache the knowledge base"""
+    # Initialize with PDFs directory
+    pdf_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'pdfs')
+    kb = KnowledgeBase(pdf_directory=pdf_dir)
+    
+    # Build knowledge base with embeddings
+    success = kb.build_knowledge_base(use_embeddings=True)
+    if not success:
+        raise Exception("Failed to build knowledge base from PDFs")
+    
+    return kb
+
+# Load knowledge base (cached for performance)
+try:
+    knowledge_base = load_knowledge_base()
+    st.success("🧠 Knowledge base loaded successfully with Dell documentation!")
+except Exception as e:
+    st.error(f"❌ Error loading knowledge base: {e}")
+    knowledge_base = None
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import io
+
+# Page configuration
+import streamlit as st
+import pandas as pd
+from io import StringIO
+import sys
+import os
+
+# Add the parent directory to path to import our engine
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from engine import KnowledgeBase
+
+# Set page config
+st.set_page_config(
+    page_title="BDM Copilot",
+    page_icon="�",
+    layout="wide"
 )
 
 def main():
@@ -90,35 +141,99 @@ Budget: CAD 350–450k. Compliance: Data residency in Ontario."""
 
 def analysis_section():
     """Analysis and summary section"""
-    st.header("Market Analysis & Summary")
+    st.header("🔍 Market Analysis & Summary")
     
     if 'discovery_notes' not in st.session_state:
         st.info("👈 Please enter discovery notes in the Input tab first.")
         return
     
-    col1, col2 = st.columns(2)
+    discovery_notes = st.session_state.discovery_notes
     
-    with col1:
-        st.markdown("### Key Requirements")
-        st.markdown("""
-        *This will be auto-generated from your notes*
-        
-        **Identified Constraints:**
-        - Budget: CAD 350-450k
-        - Timeline: Quick deployment preferred
-        - Scale: 250-300 VMs
-        - Compliance: Data residency in Ontario
-        - Preferences: VMware alignment
-        """)
+    if knowledge_base is None:
+        st.error("Knowledge base not available. Analysis will be limited.")
+        return
     
-    with col2:
-        st.markdown("### Market Insight")
-        st.markdown("""
-        *Market trend analysis*
-        
-        **Why Now:**
-        HCI adoption accelerating due to virtualization sprawl and operational complexity. VMware licensing changes driving infrastructure refresh cycles.
-        """)
+    # Analyze discovery notes using knowledge base
+    with st.spinner("🧠 Analyzing discovery notes against Dell knowledge base..."):
+        try:
+            # Find relevant content from knowledge base
+            search_results = knowledge_base.find_relevant_content(discovery_notes)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 📋 Key Requirements Identified")
+                
+                # Extract key requirements from notes
+                key_phrases = discovery_notes.lower()
+                requirements = []
+                
+                # Budget detection
+                if any(word in key_phrases for word in ['budget', 'cost', '$', 'price']):
+                    requirements.append("💰 Budget considerations identified")
+                
+                # Scale detection
+                if any(word in key_phrases for word in ['vm', 'virtual machine', 'workload', 'server']):
+                    requirements.append("📊 Scale requirements noted")
+                
+                # Technology preferences
+                if any(word in key_phrases for word in ['vmware', 'hyper-v', 'kvm']):
+                    requirements.append("💻 Virtualization platform preferences")
+                
+                # Compliance
+                if any(word in key_phrases for word in ['compliance', 'regulation', 'security']):
+                    requirements.append("🔒 Compliance requirements")
+                
+                if requirements:
+                    for req in requirements:
+                        st.markdown(f"- {req}")
+                else:
+                    st.markdown("- 📝 Requirements being analyzed...")
+            
+            with col2:
+                st.markdown("### 🎯 Relevant Dell Solutions")
+                
+                if search_results and search_results.get('results'):
+                    # Show top relevant solutions
+                    solutions_found = set()
+                    for result in search_results['results'][:5]:
+                        source_title = result.get('source_title', '')
+                        if 'vxrail' in source_title.lower():
+                            solutions_found.add("Dell VxRail HCI")
+                        elif 'powerstore' in source_title.lower():
+                            solutions_found.add("Dell PowerStore")
+                        elif 'prosupport' in source_title.lower():
+                            solutions_found.add("Dell ProSupport Services")
+                    
+                    if solutions_found:
+                        st.markdown("**Recommended Solutions:**")
+                        for solution in solutions_found:
+                            st.markdown(f"- ✅ {solution}")
+                    
+                    # Show search summary
+                    if 'summary' in search_results:
+                        st.markdown(f"**Knowledge Base:** {search_results['summary']}")
+                else:
+                    st.markdown("- 🔍 Analyzing against Dell product portfolio...")
+                    
+            # Store analysis results in session state
+            st.session_state.analysis_results = {
+                'search_results': search_results,
+                'requirements': requirements,
+                'timestamp': datetime.now()
+            }
+            
+        except Exception as e:
+            st.error(f"Error during analysis: {e}")
+            
+            # Fallback to static analysis
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("### Key Requirements")
+                st.markdown("*Analysis in progress...*")
+            with col2:
+                st.markdown("### Market Insight")
+                st.markdown("*Dell solution matching in progress...*")
 
 def outputs_section():
     """Solution options and BOM section"""
