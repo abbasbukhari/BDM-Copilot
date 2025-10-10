@@ -13,6 +13,7 @@ from datetime import datetime
 import streamlit as st
 from .pdf_processor import PDFProcessor, DocumentSearch
 from .vector_db import VectorDatabase
+from .llm_engine import bdm_llm
 
 
 class KnowledgeBase:
@@ -247,3 +248,105 @@ class KnowledgeBase:
         
         # Sort by relevance score
         return sorted(unique_results, key=lambda x: x.get('similarity_score', x.get('relevance_score', 0)), reverse=True)
+
+    def analyze_discovery_notes_with_llm(self, discovery_notes: str, max_results: int = 10) -> Dict[str, Any]:
+        """
+        Perform comprehensive BDM analysis using Adrian's methodology with LLM
+        
+        Args:
+            discovery_notes: Customer discovery notes text
+            max_results: Maximum number of knowledge base chunks to retrieve
+            
+        Returns:
+            Dict containing:
+            - llm_analysis: Structured BDM analysis following Adrian's principles
+            - relevant_content: Retrieved knowledge base content
+            - search_terms: Identified search terms
+            - llm_available: Whether LLM service is working
+        """
+        
+        if not self.is_initialized():
+            return {
+                "error": "Knowledge base not initialized",
+                "llm_analysis": {},
+                "relevant_content": [],
+                "search_terms": [],
+                "llm_available": False
+            }
+        
+        # Step 1: Retrieve relevant content from knowledge base
+        relevant_results = self.find_relevant_content(discovery_notes, max_results)
+        relevant_content = relevant_results.get('results', [])
+        search_terms = relevant_results.get('search_terms', [])
+        
+        # Step 2: Check LLM availability
+        llm_available = bdm_llm.test_connection()
+        
+        if not llm_available:
+            return {
+                "error": "LLM service not available",
+                "llm_analysis": self._fallback_bdm_analysis(discovery_notes, relevant_content),
+                "relevant_content": relevant_content,
+                "search_terms": search_terms,
+                "llm_available": False
+            }
+        
+        # Step 3: Generate comprehensive BDM analysis using LLM
+        try:
+            llm_analysis = bdm_llm.generate_bdm_analysis(
+                discovery_notes=discovery_notes,
+                relevant_content=relevant_content,
+                temperature=0.7
+            )
+            
+            return {
+                "llm_analysis": llm_analysis,
+                "relevant_content": relevant_content,
+                "search_terms": search_terms,
+                "llm_available": True,
+                "chunks_found": len(relevant_content),
+                "sources_used": len(set(chunk.get('source', 'unknown') for chunk in relevant_content))
+            }
+            
+        except Exception as e:
+            return {
+                "error": f"LLM analysis failed: {str(e)}",
+                "llm_analysis": self._fallback_bdm_analysis(discovery_notes, relevant_content),
+                "relevant_content": relevant_content,
+                "search_terms": search_terms,
+                "llm_available": False
+            }
+    
+    def _fallback_bdm_analysis(self, discovery_notes: str, relevant_content: List[Dict]) -> Dict[str, str]:
+        """Fallback BDM analysis when LLM is not available"""
+        
+        # Extract key requirements using simple keyword matching
+        requirements = []
+        notes_lower = discovery_notes.lower()
+        
+        if any(word in notes_lower for word in ['vmware', 'vsphere', 'virtualization']):
+            requirements.append("💻 VMware environment detected")
+        if any(word in notes_lower for word in ['ai', 'ml', 'machine learning', 'artificial intelligence']):
+            requirements.append("🤖 AI/ML workload requirements")
+        if any(word in notes_lower for word in ['storage', 'performance', 'bottleneck']):
+            requirements.append("📊 Storage performance needs")
+        if any(word in notes_lower for word in ['support', '24/7', 'sla']):
+            requirements.append("🛟 Enterprise support requirements")
+        if any(word in notes_lower for word in ['budget', '$', 'cost']):
+            requirements.append("💰 Budget considerations")
+        
+        # Recommend Dell solutions based on keywords
+        solutions = []
+        if any(word in notes_lower for word in ['hci', 'hyperconverged', 'infrastructure', 'simplify']):
+            solutions.append("✅ Dell VxRail HCI Platform")
+        if any(word in notes_lower for word in ['storage', 'performance', 'data']):
+            solutions.append("✅ Dell PowerStore Storage")
+        if any(word in notes_lower for word in ['support', 'service', '24/7']):
+            solutions.append("✅ Dell ProSupport Services")
+        
+        return {
+            "market_analysis": f"🔍 MARKET ANALYSIS\nIdentified {len(requirements)} key requirements from discovery notes:\n" + "\n".join(f"- {req}" for req in requirements),
+            "solution_architecture": f"🎯 DELL SOLUTION ARCHITECTURE\nRecommended Dell solutions:\n" + "\n".join(f"- {sol}" for sol in solutions),
+            "competitive_advantage": "🏆 COMPETITIVE ADVANTAGE\nDell provides integrated HCI solutions with single-vendor support, compared to multi-vendor complexity of competitors.",
+            "business_impact": "💼 BUSINESS IMPACT\nDell solutions typically reduce infrastructure management overhead and provide faster deployment compared to traditional approaches."
+        }
