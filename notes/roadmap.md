@@ -1,0 +1,2 @@
+- Today: scaffold repo, add notes/templates, push to GitHub
+- Next: collect PDFs, fill sources.md, write paper prototype outputs for Brief A

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node (if added later)
+node_modules/
+dist/
+
+# Data (big PDFs not in git)
+data/
+docs/snippets/
+
+# VS Code
+.vscode/settings.json
