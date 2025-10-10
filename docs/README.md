@@ -26,6 +26,14 @@ v0 — Foundation & planning.
 
 See [docs/ROADMAP.md](./ROADMAP.md).
 
+## License
+
+MIT License - see LICENSE file for details.
+
+## Copyright
+
+Copyright (c) 2025 Abbas Bukhari
+
 ## Disclaimer
 
 Public info only. Not affiliated with Dell or CDW.
