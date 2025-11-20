@@ -1,0 +1,13 @@
+[theme]
+primaryColor="#0076CE"  # Dell Blue
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F5F5F5"
+textColor="#333333"
+font="sans serif"
+
+[server]
+headless = true
+port = 8502
+
+[browser]
+gatherUsageStats = false
