@@ -77,10 +77,11 @@ Be specific, professional, and always tie recommendations back to customer's sta
                 self.api_url,
                 json={
                     "model": self.model_name,
-                    "prompt": "Test connection",
-                    "stream": False
+                    "prompt": "Test",
+                    "stream": False,
+                    "options": {"num_predict": 10}  # Minimal response for speed
                 },
-                timeout=30  # Increased timeout
+                timeout=5  # Faster timeout for connection test
             )
             return response.status_code == 200
         except Exception as e:

@@ -213,9 +213,10 @@ def load_custom_css():
     """, unsafe_allow_html=True)
 
 # Initialize knowledge base
+# Cache knowledge base initialization for performance
 @st.cache_resource
-def load_knowledge_base():
-    """Load and cache the knowledge base"""
+def get_knowledge_base():
+    """Load knowledge base once and cache it"""
     # Initialize with PDFs directory
     pdf_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'pdfs')
     kb = KnowledgeBase(pdf_directory=pdf_dir)
@@ -229,7 +230,7 @@ def load_knowledge_base():
 
 # Load knowledge base (cached for performance)
 try:
-    knowledge_base = load_knowledge_base()
+    knowledge_base = get_knowledge_base()
 except Exception as e:
     st.error(f"❌ Error loading knowledge base: {e}")
     knowledge_base = None
@@ -468,6 +469,11 @@ def analysis_section():
             # Get comprehensive BDM analysis using LLM
             analysis_results = knowledge_base.analyze_discovery_notes_with_llm(discovery_notes)
             
+            # Store in session state for reuse across tabs
+            st.session_state['analysis_results'] = analysis_results
+            st.session_state['llm_analysis'] = analysis_results.get('llm_analysis', {})
+            st.session_state['llm_available'] = analysis_results.get('llm_available', False)
+            
             if 'error' in analysis_results:
                 st.warning(f"⚠️ {analysis_results['error']}")
                 llm_analysis = analysis_results.get('llm_analysis', {})
@@ -593,23 +599,14 @@ def outputs_section():
         st.error("Knowledge base not available. Using fallback templates.")
         return
     
-    # Get LLM analysis for dynamic solution generation
-    with st.spinner("🔧 Generating solution options..."):
-        try:
-            analysis_results = knowledge_base.analyze_discovery_notes_with_llm(discovery_notes)
-            
-            if 'error' not in analysis_results:
-                llm_analysis = analysis_results.get('llm_analysis', {})
-                llm_available = analysis_results.get('llm_available', False)
-            else:
-                st.warning(f"⚠️ {analysis_results['error']}")
-                llm_analysis = analysis_results.get('llm_analysis', {})
-                llm_available = False
-                
-        except Exception as e:
-            st.error(f"Failed to generate dynamic solutions: {e}")
-            llm_analysis = {}
-            llm_available = False
+    # Get LLM analysis from session state (already computed in Analysis tab)
+    llm_analysis = st.session_state.get('llm_analysis', {})
+    llm_available = st.session_state.get('llm_available', False)
+    
+    # If analysis not yet run, show message
+    if not llm_analysis and not st.session_state.get('analysis_complete', False):
+        st.info("💡 Please run the analysis in the 'Market Analysis & Insights' tab first.")
+        llm_available = False
     
     # Display LLM status
     status_color = "🟢" if llm_available else "🟡"
@@ -671,9 +668,12 @@ NOW create 3 options for {customer_name} following this EXACT format:"""
                             "model": "llama3.2:3b",
                             "prompt": solution_prompt,
                             "stream": False,
-                            "options": {"temperature": 0.5}
+                            "options": {
+                                "temperature": 0.3,
+                                "num_predict": 400
+                            }
                         },
-                        timeout=45
+                        timeout=30
                     )
                     
                     if response.status_code == 200:
@@ -940,22 +940,15 @@ def communications_section():
         """, unsafe_allow_html=True)
         return
     
-    # Get customer info and LLM analysis
+    # Get customer info and LLM analysis from session state
     discovery_notes = st.session_state.discovery_notes
     customer_name = st.session_state.get('customer_name', '[Customer Name]')
+    llm_analysis = st.session_state.get('llm_analysis', {})
+    llm_available = st.session_state.get('llm_available', False)
     
-    # Get LLM analysis for dynamic email generation
-    if knowledge_base:
-        with st.spinner("✉️ Generating personalized communications..."):
-            try:
-                analysis_results = knowledge_base.analyze_discovery_notes_with_llm(discovery_notes)
-                llm_analysis = analysis_results.get('llm_analysis', {})
-                llm_available = analysis_results.get('llm_available', False)
-            except:
-                llm_analysis = {}
-                llm_available = False
-    else:
-        llm_analysis = {}
+    # If analysis not yet run, show message
+    if not llm_analysis and not st.session_state.get('analysis_complete', False):
+        st.info("💡 Please run the analysis in the 'Market Analysis & Insights' tab first.")
         llm_available = False
     
     # Display LLM status for communications
@@ -1001,9 +994,12 @@ Write the complete email now:"""
                         "model": "llama3.2:3b",
                         "prompt": recap_prompt,
                         "stream": False,
-                        "options": {"temperature": 0.5}
+                        "options": {
+                            "temperature": 0.3,
+                            "num_predict": 350
+                        }
                     },
-                    timeout=45
+                    timeout=30
                 )
                 
                 if response.status_code == 200:
@@ -1173,9 +1169,12 @@ Write the complete executive summary email FROM Dell TO {customer_name} executiv
                         "model": "llama3.2:3b",
                         "prompt": exec_prompt,
                         "stream": False,
-                        "options": {"temperature": 0.4}
+                        "options": {
+                            "temperature": 0.3,
+                            "num_predict": 350
+                        }
                     },
-                    timeout=45
+                    timeout=30
                 )
                 
                 if response.status_code == 200:
